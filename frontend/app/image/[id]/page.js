@@ -9,23 +9,34 @@ import Navbar from '@/app/components/Navbar';
 
 export default function ImageDetail() {
   const params = useParams();
+
   const [image, setImage] = useState(null);
   const [loading, setLoading] = useState(true);
   const [liked, setLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(0);
+
   const { user } = authStore();
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+
+  const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
+  const token =
+    typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 
   useEffect(() => {
     const fetchImage = async () => {
       try {
-        const response = await axios.get(`${API_URL}/images/${params.id}`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
+        const response = await axios.get(
+          `${API_URL}/images/${params.id}`,
+          {
+            headers: token
+              ? { Authorization: `Bearer ${token}` }
+              : {},
+          }
+        );
+
         setImage(response.data);
         setLiked(response.data.liked || false);
-        setLikesCount(response.data.likes_count);
+        setLikesCount(response.data.likes_count || 0);
       } catch (error) {
         console.error('Failed to fetch image:', error);
       } finally {
@@ -43,44 +54,59 @@ export default function ImageDetail() {
     }
 
     try {
-      if (liked) {
-        await axios.delete(`${API_URL}/likes/${params.id}/like`, {
+      await axios.post(
+        `${API_URL}/likes/${params.id}`,
+        {},
+        {
           headers: { Authorization: `Bearer ${token}` },
-        });
-        setLiked(false);
-        setLikesCount(likesCount - 1);
-      } else {
-        await axios.post(`${API_URL}/likes/${params.id}/like`, {}, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setLiked(true);
-        setLikesCount(likesCount + 1);
-      }
+        }
+      );
+
+      setLiked((prev) => !prev);
+
+      setLikesCount((prev) =>
+        liked ? prev - 1 : prev + 1
+      );
     } catch (error) {
       console.error('Failed to update like:', error);
     }
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
-  if (!image) return <div className="min-h-screen flex items-center justify-center">Image not found</div>;
+  if (loading)
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        Loading...
+      </div>
+    );
+
+  if (!image)
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        Image not found
+      </div>
+    );
 
   return (
     <>
       <Navbar />
+
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+
           <img
-            src={image.image_url}
+            src={`${process.env.NEXT_PUBLIC_API_URL?.replace('/api','')}${image.image_url}`}
             alt={image.title}
             className="w-full max-h-96 object-contain"
           />
 
           <div className="p-8">
+
             <div className="flex justify-between items-start mb-4">
               <div>
                 <h1 className="text-3xl font-bold text-gray-900 mb-2">
                   {image.title}
                 </h1>
+
                 <Link
                   href={`/profile/${image.user_id}`}
                   className="text-purple-600 hover:underline"
@@ -88,6 +114,7 @@ export default function ImageDetail() {
                   By {image.username}
                 </Link>
               </div>
+
               <button
                 onClick={handleLike}
                 className={`px-6 py-3 rounded-lg font-semibold transition ${
@@ -108,9 +135,11 @@ export default function ImageDetail() {
 
             <div className="border-t pt-4">
               <p className="text-sm text-gray-500">
-                Published on {new Date(image.created_at).toLocaleDateString()}
+                Published on{' '}
+                {new Date(image.created_at).toLocaleDateString()}
               </p>
             </div>
+
           </div>
         </div>
 

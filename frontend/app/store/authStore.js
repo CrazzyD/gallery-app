@@ -2,7 +2,9 @@ import { create } from 'zustand';
 import axios from 'axios';
 import Cookies from 'js-cookie';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  'https://gallery-app-4cmf.onrender.com/api';
 
 const authStore = create((set, get) => ({
   user: null,
@@ -10,11 +12,15 @@ const authStore = create((set, get) => ({
   isLoading: false,
   error: null,
 
+  // =====================
+  // SET AUTH (ядро системы)
+  // =====================
   setAuth: (user, token) => {
     set({ user, token });
 
     if (token) {
       Cookies.set('token', token, { expires: 7 });
+
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     } else {
       Cookies.remove('token');
@@ -22,6 +28,9 @@ const authStore = create((set, get) => ({
     }
   },
 
+  // =====================
+  // REGISTER
+  // =====================
   register: async (username, email, password) => {
     set({ isLoading: true, error: null });
 
@@ -35,16 +44,21 @@ const authStore = create((set, get) => ({
       get().setAuth(res.data.user, res.data.token);
 
       set({ isLoading: false });
+
       return res.data;
     } catch (err) {
       set({
         error: err.response?.data?.error || 'Registration failed',
         isLoading: false,
       });
+
       throw err;
     }
   },
 
+  // =====================
+  // LOGIN
+  // =====================
   login: async (email, password) => {
     set({ isLoading: true, error: null });
 
@@ -57,22 +71,32 @@ const authStore = create((set, get) => ({
       get().setAuth(res.data.user, res.data.token);
 
       set({ isLoading: false });
+
       return res.data;
     } catch (err) {
       set({
         error: err.response?.data?.error || 'Login failed',
         isLoading: false,
       });
+
       throw err;
     }
   },
 
+  // =====================
+  // LOGOUT
+  // =====================
   logout: () => {
     get().setAuth(null, null);
+    set({ user: null, token: null });
   },
 
+  // =====================
+  // CHECK AUTH
+  // =====================
   checkAuth: async () => {
     const token = Cookies.get('token');
+
     if (!token) return;
 
     try {
@@ -84,7 +108,7 @@ const authStore = create((set, get) => ({
         user: res.data,
         token,
       });
-    } catch {
+    } catch (err) {
       get().logout();
     }
   },
