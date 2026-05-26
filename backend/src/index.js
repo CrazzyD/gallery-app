@@ -20,7 +20,7 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 /* =========================
-   TRUST PROXY (ВАЖНО ДЛЯ RENDER)
+   TRUST PROXY (RENDER)
 ========================= */
 app.set('trust proxy', 1);
 
@@ -34,36 +34,36 @@ app.use(
 );
 
 /* =========================
-   CORS
+   CORS (FIXED)
 ========================= */
+
 const allowedOrigins = [
   'http://localhost:3000',
-  'https://gallery-pied-six.vercel.app',
-];
+  process.env.FRONTEND_URL, // <- Vercel берём отсюда
+].filter(Boolean);
 
 const corsOptions = {
-  origin: function (origin, callback) {
-    // Разрешаем server-to-server / curl / мобильные без origin
+  origin: (origin, callback) => {
+    // Postman / server-to-server
     if (!origin) return callback(null, true);
 
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
 
-    // Блокируем неизвестные origins (раньше пропускало всех — баг)
-    return callback(new Error(`CORS: origin ${origin} not allowed`), false);
+    console.error('❌ CORS blocked origin:', origin);
+    return callback(new Error(`CORS not allowed: ${origin}`), false);
   },
+
   credentials: true,
+
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+
   allowedHeaders: ['Content-Type', 'Authorization'],
 };
 
+/* APPLY CORS */
 app.use(cors(corsOptions));
-
-/* =========================
-   HANDLE PREFLIGHT
-========================= */
-// Передаём тот же конфиг, иначе preflight игнорирует ограничения
 app.options('*', cors(corsOptions));
 
 /* =========================
@@ -124,44 +124,46 @@ app.use((req, res) => {
    ERROR HANDLER
 ========================= */
 app.use((err, req, res, next) => {
-  // CORS-ошибки — 403, остальное — 500
-  if (err.message?.startsWith('CORS:')) {
+  if (err.message?.includes('CORS')) {
     return res.status(403).json({ error: err.message });
   }
+
   console.error('🔥 SERVER ERROR:', err);
-  res.status(err.status || 500).json({
+
+  res.status(500).json({
     error: err.message || 'Internal server error',
   });
 });
 
 /* =========================
-   START + GRACEFUL SHUTDOWN
+   START SERVER
 ========================= */
 const server = app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
 
-// Graceful shutdown — важно для Render/Docker
+/* =========================
+   SHUTDOWN HANDLER
+========================= */
 const shutdown = (signal) => {
-  console.log(`\n${signal} received. Shutting down gracefully...`);
+  console.log(`\n${signal} received. Shutting down...`);
+
   server.close(() => {
-    console.log('✅ HTTP server closed');
+    console.log('✅ Server closed');
     process.exit(0);
   });
 
-  // Если за 10 сек не закрылся — принудительно
   setTimeout(() => {
-    console.error('⚠️ Forced shutdown after timeout');
+    console.error('⚠️ Forced shutdown');
     process.exit(1);
-  }, 10_000);
+  }, 10000);
 };
 
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
 
-// Ловим необработанные ошибки — не даём процессу упасть молча
-process.on('unhandledRejection', (reason) => {
-  console.error('🔥 Unhandled Rejection:', reason);
+process.on('unhandledRejection', (err) => {
+  console.error('🔥 Unhandled Rejection:', err);
 });
 
 process.on('uncaughtException', (err) => {
