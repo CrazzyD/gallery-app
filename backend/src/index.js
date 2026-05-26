@@ -19,9 +19,6 @@ dotenv.config({ path: path.join(__dirname, '../.env') });
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-/* =========================
-   TRUST PROXY (RENDER)
-========================= */
 app.set('trust proxy', 1);
 
 /* =========================
@@ -34,34 +31,37 @@ app.use(
 );
 
 /* =========================
-   CORS (HARD FIX - NO CRASH)
+   CORS FIX (PRODUCTION SAFE)
 ========================= */
 
 const allowedOrigins = [
   'http://localhost:3000',
-  process.env.FRONTEND_URL,
+  'http://localhost:3001',
   'https://gallery-pied-six.vercel.app',
   'https://gallery-app-git-main-crazzyds-projects.vercel.app',
+  process.env.FRONTEND_URL,
 ].filter(Boolean);
 
 const corsOptions = {
   origin: (origin, callback) => {
-    console.log('🌍 Request Origin:', origin);
+    console.log('🌍 Origin:', origin);
 
-    // allow tools like postman / server-to-server
+    // allow server-to-server / postman
     if (!origin) return callback(null, true);
 
-    // allow any Vercel preview OR exact match
-    const isAllowed =
+    // strict match OR vercel preview support
+    const allowed =
       allowedOrigins.includes(origin) ||
-      origin.includes('vercel.app');
+      /^https:\/\/.*\.vercel\.app$/.test(origin);
 
-    if (isAllowed) {
+    if (allowed) {
       return callback(null, true);
     }
 
     console.error('❌ CORS BLOCKED:', origin);
-    return callback(null, true); // <-- IMPORTANT: no crash, just allow fallback
+
+    // ❗ ВАЖНО: НЕ БЛОКИРУЕМ ЖЁСТКО (иначе Render иногда даёт пустой ответ)
+    return callback(null, false);
   },
 
   credentials: true,
@@ -69,33 +69,21 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization'],
 };
 
-/* APPLY CORS */
+/* =========================
+   APPLY CORS PROPERLY
+========================= */
 app.use(cors(corsOptions));
+
+// IMPORTANT FOR PRELIGHT
 app.options('*', cors(corsOptions));
 
 /* =========================
-   BODY PARSER
+   BODY
 ========================= */
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-/* =========================
-   COMPRESSION
-========================= */
 app.use(compression());
-
-/* =========================
-   STATIC FILES
-========================= */
-app.use(
-  '/uploads',
-  express.static(path.join(__dirname, '../uploads'), {
-    setHeaders: (res) => {
-      res.set('Cross-Origin-Resource-Policy', 'cross-origin');
-      res.set('Cache-Control', 'public, max-age=31536000');
-    },
-  })
-);
 
 /* =========================
    ROUTES
@@ -107,69 +95,35 @@ app.use('/api/users', userRoutes);
 app.use('/api/comments', commentRoutes);
 
 /* =========================
-   HEALTH CHECK
+   HEALTH
 ========================= */
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', time: new Date().toISOString() });
+  res.json({ status: 'ok' });
 });
 
 /* =========================
    ROOT
 ========================= */
 app.get('/', (req, res) => {
-  res.json({ message: 'Gallery Backend Running 🚀' });
+  res.json({ message: 'API running' });
 });
 
 /* =========================
-   404
-========================= */
-app.use((req, res) => {
-  res.status(404).json({ error: 'Not found' });
-});
-
-/* =========================
-   ERROR HANDLER
+   ERROR HANDLER (IMPORTANT FIX)
 ========================= */
 app.use((err, req, res, next) => {
   console.error('🔥 ERROR:', err);
 
-  res.status(500).json({
-    error: err.message || 'Internal server error',
+  res.setHeader('Access-Control-Allow-Origin', '*');
+
+  res.status(err.status || 500).json({
+    error: err.message || 'Server error',
   });
 });
 
 /* =========================
-   START SERVER
+   START
 ========================= */
-const server = app.listen(PORT, () => {
+app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
-});
-
-/* =========================
-   SHUTDOWN
-========================= */
-const shutdown = (signal) => {
-  console.log(`\n${signal} received. shutting down...`);
-
-  server.close(() => {
-    console.log('✅ Server closed');
-    process.exit(0);
-  });
-
-  setTimeout(() => {
-    console.error('⚠️ Force shutdown');
-    process.exit(1);
-  }, 10000);
-};
-
-process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT', () => shutdown('SIGINT'));
-
-process.on('unhandledRejection', (err) => {
-  console.error('🔥 Unhandled Rejection:', err);
-});
-
-process.on('uncaughtException', (err) => {
-  console.error('🔥 Uncaught Exception:', err);
-  shutdown('uncaughtException');
 });
