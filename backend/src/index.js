@@ -34,25 +34,27 @@ app.use(
 );
 
 /* =========================
-   CORS (FIXED)
+   CORS (PRODUCTION FIX)
 ========================= */
 
 const allowedOrigins = [
   'http://localhost:3000',
-  process.env.FRONTEND_URL, // <- Vercel берём отсюда
+  process.env.FRONTEND_URL,
 ].filter(Boolean);
 
 const corsOptions = {
   origin: (origin, callback) => {
-    // Postman / server-to-server
+    console.log('🌍 Origin:', origin);
+
+    // allow server-to-server / postman
     if (!origin) return callback(null, true);
 
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
 
-    console.error('❌ CORS blocked origin:', origin);
-    return callback(new Error(`CORS not allowed: ${origin}`), false);
+    console.error('❌ CORS BLOCKED:', origin);
+    return callback(new Error('CORS not allowed'), false);
   },
 
   credentials: true,
@@ -124,11 +126,11 @@ app.use((req, res) => {
    ERROR HANDLER
 ========================= */
 app.use((err, req, res, next) => {
+  console.error('🔥 ERROR:', err);
+
   if (err.message?.includes('CORS')) {
     return res.status(403).json({ error: err.message });
   }
-
-  console.error('🔥 SERVER ERROR:', err);
 
   res.status(500).json({
     error: err.message || 'Internal server error',
@@ -146,7 +148,7 @@ const server = app.listen(PORT, () => {
    SHUTDOWN HANDLER
 ========================= */
 const shutdown = (signal) => {
-  console.log(`\n${signal} received. Shutting down...`);
+  console.log(`\n${signal} received. shutting down...`);
 
   server.close(() => {
     console.log('✅ Server closed');
@@ -154,7 +156,7 @@ const shutdown = (signal) => {
   });
 
   setTimeout(() => {
-    console.error('⚠️ Forced shutdown');
+    console.error('⚠️ Force shutdown');
     process.exit(1);
   }, 10000);
 };
