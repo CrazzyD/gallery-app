@@ -1,0 +1,13 @@
+.DS_Store
+.git
+.env
+.env.local
+node_modules/
+npm-debug.log
+.next
+.vercel
+uploads/
+dist/
+build/
+.vscode
+.idea

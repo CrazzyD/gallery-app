@@ -1,0 +1,17 @@
+backend/
+frontend/
+database/
+.github/
+.git
+.DS_Store
+.env
+.env.local
+.vscode/
+.idea/
+node_modules/
+uploads/
+dist/
+build/
+.next
+.vercel
+npm-debug.log
