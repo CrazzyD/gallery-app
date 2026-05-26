@@ -6,18 +6,14 @@ import authStore from '../store/authStore';
 import Link from 'next/link';
 import axios from 'axios';
 
-const API =
-  process.env.NEXT_PUBLIC_API_URL ||
-  'https://gallery-app-4cmf.onrender.com/api';
+const API = process.env.NEXT_PUBLIC_API_URL;
 
 export default function LoginPage() {
   const router = useRouter();
-
-  const login = authStore((state) => state.login);
+  const { setAuth } = authStore();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -32,14 +28,18 @@ export default function LoginPage() {
       setLoading(true);
       setError(null);
 
-      const res = await login(email, password);
+      const res = await axios.post(`${API}/auth/login`, {
+        email,
+        password,
+      });
 
-      if (res?.token) {
-        router.push('/gallery');
-      }
+      const { user, token } = res.data;
+
+      setAuth(user, token);
+
+      router.push('/gallery');
     } catch (err) {
-      console.error(err.response?.data || err.message);
-      setError(err.response?.data?.error || 'Invalid email or password');
+      setError(err.response?.data?.error || 'Login failed');
     } finally {
       setLoading(false);
     }
@@ -101,7 +101,7 @@ export default function LoginPage() {
 }
 
 /* =========================
-   STYLES (FIXED)
+   STYLES (ВОТ ЭТО ТЫ ЗАБЫЛ)
 ========================= */
 
 const styles = {
@@ -157,7 +157,6 @@ const styles = {
     background: 'none',
     border: 'none',
     cursor: 'pointer',
-    color: '#666',
     fontSize: 12,
   },
 
