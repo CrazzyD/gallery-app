@@ -3,7 +3,9 @@
 import { useState } from 'react';
 import axios from 'axios';
 
-const API = process.env.NEXT_PUBLIC_API_URL;
+const API =
+  process.env.NEXT_PUBLIC_API_URL ||
+  'https://gallery-app-4cmf.onrender.com/api';
 
 export default function UploadPage() {
   const [file, setFile] = useState(null);
@@ -23,6 +25,7 @@ export default function UploadPage() {
 
   const handleUpload = async () => {
     const token = localStorage.getItem('token');
+
     if (!file || !title) return;
 
     const formData = new FormData();
@@ -46,7 +49,6 @@ export default function UploadPage() {
       setTitle('');
       setDescription('');
       setSuccess(true);
-
     } catch (err) {
       console.error('UPLOAD ERROR:', err.response?.data || err.message);
       alert('Upload error');
@@ -102,3 +104,90 @@ export default function UploadPage() {
     </div>
   );
 }
+
+/* =========================
+   STYLES (ВОТ ЧЕГО НЕ ХВАТАЛО)
+========================= */
+
+const styles = {
+  page: {
+    minHeight: '100vh',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    background: '#f5f5f5',
+  },
+
+  card: {
+    width: 420,
+    background: '#fff',
+    padding: 25,
+    borderRadius: 16,
+    boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
+    textAlign: 'center',
+  },
+
+  title: {
+    marginBottom: 20,
+  },
+
+  previewBox: {
+    width: '100%',
+    height: 220,
+    border: '2px dashed #ddd',
+    borderRadius: 12,
+    marginBottom: 15,
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+
+  previewImg: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+  },
+
+  placeholder: {
+    color: '#aaa',
+  },
+
+  file: {
+    marginBottom: 10,
+    width: '100%',
+  },
+
+  input: {
+    width: '100%',
+    padding: 10,
+    marginBottom: 10,
+    borderRadius: 10,
+    border: '1px solid #ddd',
+  },
+
+  textarea: {
+    width: '100%',
+    padding: 10,
+    marginBottom: 10,
+    borderRadius: 10,
+    border: '1px solid #ddd',
+    minHeight: 80,
+  },
+
+  button: {
+    width: '100%',
+    padding: 12,
+    borderRadius: 10,
+    border: 'none',
+    background: '#4f46e5',
+    color: '#fff',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+  },
+
+  success: {
+    color: 'green',
+    marginTop: 10,
+  },
+};
