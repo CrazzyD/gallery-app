@@ -6,11 +6,14 @@ import authStore from '../store/authStore';
 import Link from 'next/link';
 import axios from 'axios';
 
-const API = process.env.NEXT_PUBLIC_API_URL;
+const API =
+  process.env.NEXT_PUBLIC_API_URL ||
+  'https://gallery-app-4cmf.onrender.com/api';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { setUser, setToken } = authStore();
+
+  const login = authStore((state) => state.login);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -29,18 +32,11 @@ export default function LoginPage() {
       setLoading(true);
       setError(null);
 
-      const res = await axios.post(`${API}/auth/login`, {
-        email,
-        password,
-      });
+      const res = await login(email, password);
 
-      const { user, token } = res.data;
-
-      setUser(user);
-      setToken(token);
-
-      router.push('/gallery');
-
+      if (res?.token) {
+        router.push('/gallery');
+      }
     } catch (err) {
       console.error(err.response?.data || err.message);
       setError(err.response?.data?.error || 'Invalid email or password');
@@ -103,3 +99,88 @@ export default function LoginPage() {
     </div>
   );
 }
+
+/* =========================
+   STYLES (FIXED)
+========================= */
+
+const styles = {
+  page: {
+    minHeight: '100vh',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    background: 'linear-gradient(135deg, #667eea, #764ba2)',
+  },
+
+  card: {
+    width: 420,
+    background: '#fff',
+    padding: 30,
+    borderRadius: 16,
+    boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+    textAlign: 'center',
+  },
+
+  title: {
+    marginBottom: 20,
+  },
+
+  field: {
+    textAlign: 'left',
+    marginBottom: 14,
+  },
+
+  label: {
+    fontSize: 13,
+    color: '#555',
+    marginBottom: 6,
+    display: 'block',
+  },
+
+  input: {
+    width: '100%',
+    padding: 12,
+    borderRadius: 10,
+    border: '1px solid #ddd',
+    outline: 'none',
+  },
+
+  passwordBox: {
+    position: 'relative',
+  },
+
+  eyeBtn: {
+    position: 'absolute',
+    right: 10,
+    top: 10,
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    color: '#666',
+    fontSize: 12,
+  },
+
+  button: {
+    width: '100%',
+    padding: 12,
+    borderRadius: 10,
+    border: 'none',
+    background: '#4f46e5',
+    color: '#fff',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+    marginTop: 10,
+  },
+
+  error: {
+    color: 'red',
+    fontSize: 13,
+    marginBottom: 10,
+  },
+
+  text: {
+    marginTop: 12,
+    fontSize: 14,
+  },
+};
