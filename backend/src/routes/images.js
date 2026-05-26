@@ -1,30 +1,19 @@
 import express from 'express';
 import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
-import { fileURLToPath } from 'url';
 
 import pool from '../config/database.js';
 import { verifyToken, optionalToken } from '../middleware/auth.js';
-import { validateImageFile, validateImageTitle } from '../utils/validators.js';
+import { validateImageTitle } from '../utils/validators.js';
+
+import cloudinary from '../config/cloudinary.js';
 
 const router = express.Router();
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /* =========================
-   MULTER CONFIG
+   MULTER (memory storage)
 ========================= */
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, '../../uploads'));
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `${uuidv4()}${ext}`);
-  },
-});
-
+const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
 /* =========================
@@ -77,49 +66,72 @@ router.get('/', optionalToken, async (req, res) => {
 });
 
 /* =========================
-   UPLOAD IMAGE
+   UPLOAD IMAGE (CLOUDINARY FIX)
 ========================= */
-router.post('/upload', verifyToken, upload.single('image'), async (req, res) => {
-  try {
-    const { title, description } = req.body;
+router.post(
+  '/upload',
+  verifyToken,
+  upload.single('image'),
+  async (req, res) => {
+    try {
+      const { title, description } = req.body;
 
-    if (!req.file) {
-      return res.status(400).json({ error: 'No image provided' });
+      if (!req.file) {
+        return res.status(400).json({ error: 'No image provided' });
+      }
+
+      if (!validateImageTitle(title)) {
+        return res.status(400).json({ error: 'Invalid title' });
+      }
+
+      /* =========================
+         UPLOAD TO CLOUDINARY
+      ========================= */
+      const uploadResult = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          {
+            folder: 'gallery',
+          },
+          (error, result) => {
+            if (error) return reject(error);
+            resolve(result);
+          }
+        );
+
+        stream.end(req.file.buffer);
+      });
+
+      const imageId = uuidv4();
+      const imageUrl = uploadResult.secure_url;
+
+      const result = await pool.query(
+        `
+        INSERT INTO images (id, user_id, title, description, image_url)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING *
+        `,
+        [
+          imageId,
+          req.user.userId,
+          title,
+          description || '',
+          imageUrl,
+        ]
+      );
+
+      res.status(201).json({
+        message: 'Uploaded',
+        image: result.rows[0],
+      });
+    } catch (err) {
+      console.error('UPLOAD ERROR:', err);
+      res.status(500).json({ error: 'Upload failed' });
     }
-
-    if (!validateImageTitle(title)) {
-      return res.status(400).json({ error: 'Invalid title' });
-    }
-
-    const check = validateImageFile(req.file);
-    if (!check.valid) {
-      return res.status(400).json({ error: check.error });
-    }
-
-    const imageId = uuidv4();
-    const imageUrl = `/uploads/${req.file.filename}`;
-
-    const result = await pool.query(
-      `
-      INSERT INTO images (id, user_id, title, description, image_url)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING *
-      `,
-      [imageId, req.user.userId, title, description || '', imageUrl]
-    );
-
-    res.status(201).json({
-      message: 'Uploaded',
-      image: result.rows[0],
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Upload failed' });
   }
-});
+);
 
 /* =========================
-   DELETE IMAGE (FIXED)
+   DELETE IMAGE (CLOUDINARY SAFE)
 ========================= */
 router.delete('/:id', verifyToken, async (req, res) => {
   try {
@@ -136,23 +148,24 @@ router.delete('/:id', verifyToken, async (req, res) => {
 
     const image = result.rows[0];
 
-    // ownership check
     if (image.user_id !== req.user.userId) {
       return res.status(403).json({ error: 'Not allowed' });
     }
 
-    // delete file
-    const filePath = path.join(
-      process.cwd(),
-      'uploads',
-      path.basename(image.image_url)
-    );
+    /* =========================
+       DELETE FROM CLOUDINARY
+    ========================= */
+    try {
+      const publicId = image.image_url
+        .split('/')
+        .pop()
+        .split('.')[0];
 
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
+      await cloudinary.uploader.destroy(`gallery/${publicId}`);
+    } catch (e) {
+      console.log('Cloudinary delete failed (non-critical)', e.message);
     }
 
-    // delete db
     await pool.query('DELETE FROM images WHERE id = $1', [imageId]);
 
     res.json({ success: true });
