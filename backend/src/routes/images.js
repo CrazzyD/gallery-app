@@ -5,16 +5,18 @@ import { v4 as uuidv4 } from 'uuid';
 import pool from '../config/database.js';
 import { verifyToken, optionalToken } from '../middleware/auth.js';
 import { validateImageTitle } from '../utils/validators.js';
-
 import cloudinary from '../config/cloudinary.js';
 
 const router = express.Router();
 
 /* =========================
-   MULTER (memory storage)
+   MEMORY STORAGE (NO DISK)
 ========================= */
 const storage = multer.memoryStorage();
-const upload = multer({ storage });
+const upload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+});
 
 /* =========================
    GET ALL IMAGES
@@ -66,7 +68,7 @@ router.get('/', optionalToken, async (req, res) => {
 });
 
 /* =========================
-   UPLOAD IMAGE (CLOUDINARY FIX)
+   UPLOAD IMAGE (CLOUDINARY FIXED)
 ========================= */
 router.post(
   '/upload',
@@ -91,6 +93,7 @@ router.post(
         const stream = cloudinary.uploader.upload_stream(
           {
             folder: 'gallery',
+            resource_type: 'image',
           },
           (error, result) => {
             if (error) return reject(error);
@@ -102,7 +105,6 @@ router.post(
       });
 
       const imageId = uuidv4();
-      const imageUrl = uploadResult.secure_url;
 
       const result = await pool.query(
         `
@@ -115,12 +117,12 @@ router.post(
           req.user.userId,
           title,
           description || '',
-          imageUrl,
+          uploadResult.secure_url,
         ]
       );
 
       res.status(201).json({
-        message: 'Uploaded',
+        message: 'Uploaded successfully',
         image: result.rows[0],
       });
     } catch (err) {
@@ -131,7 +133,7 @@ router.post(
 );
 
 /* =========================
-   DELETE IMAGE (CLOUDINARY SAFE)
+   DELETE IMAGE (CLOUDINARY FIXED)
 ========================= */
 router.delete('/:id', verifyToken, async (req, res) => {
   try {
@@ -153,17 +155,16 @@ router.delete('/:id', verifyToken, async (req, res) => {
     }
 
     /* =========================
-       DELETE FROM CLOUDINARY
+       DELETE FROM CLOUDINARY (SAFE)
     ========================= */
     try {
-      const publicId = image.image_url
-        .split('/')
-        .pop()
-        .split('.')[0];
+      const parts = image.image_url.split('/');
+      const fileWithExt = parts[parts.length - 1];
+      const publicId = fileWithExt.split('.')[0];
 
       await cloudinary.uploader.destroy(`gallery/${publicId}`);
     } catch (e) {
-      console.log('Cloudinary delete failed (non-critical)', e.message);
+      console.log('Cloudinary delete failed (non-critical):', e.message);
     }
 
     await pool.query('DELETE FROM images WHERE id = $1', [imageId]);
