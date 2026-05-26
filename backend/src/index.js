@@ -34,35 +34,37 @@ app.use(
 );
 
 /* =========================
-   CORS (FIX 100%)
+   CORS
 ========================= */
 const allowedOrigins = [
   'http://localhost:3000',
   'https://gallery-pied-six.vercel.app',
 ];
 
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      // allow server-to-server / mobile / curl
-      if (!origin) return callback(null, true);
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Разрешаем server-to-server / curl / мобильные без origin
+    if (!origin) return callback(null, true);
 
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
 
-      return callback(null, true); // 👈 ВАЖНО: не ломаем preflight вообще
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-  })
-);
+    // Блокируем неизвестные origins (раньше пропускало всех — баг)
+    return callback(new Error(`CORS: origin ${origin} not allowed`), false);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
+
+app.use(cors(corsOptions));
 
 /* =========================
-   HANDLE PREFLIGHT (CRITICAL FIX)
+   HANDLE PREFLIGHT
 ========================= */
-app.options('*', cors());
+// Передаём тот же конфиг, иначе preflight игнорирует ограничения
+app.options('*', cors(corsOptions));
 
 /* =========================
    BODY PARSER
@@ -101,19 +103,14 @@ app.use('/api/comments', commentRoutes);
    HEALTH CHECK
 ========================= */
 app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    time: new Date().toISOString(),
-  });
+  res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
 /* =========================
    ROOT
 ========================= */
 app.get('/', (req, res) => {
-  res.json({
-    message: 'Gallery Backend Running 🚀',
-  });
+  res.json({ message: 'Gallery Backend Running 🚀' });
 });
 
 /* =========================
@@ -127,15 +124,47 @@ app.use((req, res) => {
    ERROR HANDLER
 ========================= */
 app.use((err, req, res, next) => {
+  // CORS-ошибки — 403, остальное — 500
+  if (err.message?.startsWith('CORS:')) {
+    return res.status(403).json({ error: err.message });
+  }
   console.error('🔥 SERVER ERROR:', err);
-  res.status(500).json({
+  res.status(err.status || 500).json({
     error: err.message || 'Internal server error',
   });
 });
 
 /* =========================
-   START
+   START + GRACEFUL SHUTDOWN
 ========================= */
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on ${PORT}`);
+const server = app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+});
+
+// Graceful shutdown — важно для Render/Docker
+const shutdown = (signal) => {
+  console.log(`\n${signal} received. Shutting down gracefully...`);
+  server.close(() => {
+    console.log('✅ HTTP server closed');
+    process.exit(0);
+  });
+
+  // Если за 10 сек не закрылся — принудительно
+  setTimeout(() => {
+    console.error('⚠️ Forced shutdown after timeout');
+    process.exit(1);
+  }, 10_000);
+};
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+
+// Ловим необработанные ошибки — не даём процессу упасть молча
+process.on('unhandledRejection', (reason) => {
+  console.error('🔥 Unhandled Rejection:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('🔥 Uncaught Exception:', err);
+  shutdown('uncaughtException');
 });
