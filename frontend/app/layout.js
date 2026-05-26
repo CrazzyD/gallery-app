@@ -5,7 +5,6 @@ export default function RootLayout({ children }) {
     <html lang="en">
       <body style={{ margin: 0, background: '#f3f4f6' }}>
         <Navbar />
-
         <div
           style={{
             maxWidth: '1100px',

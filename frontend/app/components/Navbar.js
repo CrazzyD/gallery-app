@@ -1,10 +1,15 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect } from 'react';
 import authStore from '../store/authStore';
 
 export default function Navbar() {
-  const { user, logout } = authStore();
+  const { user, logout, checkAuth } = authStore();
+
+  useEffect(() => {
+    checkAuth();
+  }, []);
 
   return (
     <div
@@ -27,11 +32,7 @@ export default function Navbar() {
         {user ? (
           <>
             <Link href="/upload">Upload</Link>
-
-            <span style={{ color: '#555' }}>
-              👤 {user.username}
-            </span>
-
+            <span style={{ color: '#555' }}>👤 {user.username}</span>
             <button
               onClick={logout}
               style={{

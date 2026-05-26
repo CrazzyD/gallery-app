@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 
@@ -12,22 +14,18 @@ export default function GalleryPage() {
 
   const API = process.env.NEXT_PUBLIC_API_URL || '';
 
-  // ✅ Читаем токен только на клиенте — не во время SSR/prerender
   useEffect(() => {
     setToken(localStorage.getItem('token'));
   }, []);
 
   useEffect(() => {
-    if (!API) return; // ✅ Не делаем запрос если API не задан
+    if (!API) return;
     axios
       .get(`${API}/images`)
       .then((res) => setImages(res.data.images ?? []))
       .catch(console.error);
   }, [API]);
 
-  /* =========================
-     OPEN IMAGE
-  ========================= */
   const openImage = async (img) => {
     setSelected(img);
     try {
@@ -39,9 +37,6 @@ export default function GalleryPage() {
     }
   };
 
-  /* =========================
-     LIKE
-  ========================= */
   const toggleLike = async (id) => {
     try {
       await axios.post(
@@ -49,7 +44,6 @@ export default function GalleryPage() {
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
-
       setImages((prev) =>
         prev.map((img) => {
           if (img.id !== id) return img;
@@ -67,9 +61,6 @@ export default function GalleryPage() {
     }
   };
 
-  /* =========================
-     DELETE IMAGE
-  ========================= */
   const deleteImage = async (id) => {
     if (!confirm('Удалить изображение?')) return;
     try {
@@ -84,9 +75,6 @@ export default function GalleryPage() {
     }
   };
 
-  /* =========================
-     SEND COMMENT
-  ========================= */
   const sendComment = async () => {
     if (!commentText.trim() || !selected) return;
     try {
@@ -102,18 +90,11 @@ export default function GalleryPage() {
     }
   };
 
-  /* =========================
-     HELPERS
-  ========================= */
-  // ✅ Безопасное формирование URL — не крашится если API = undefined
   const getImageUrl = (imageUrl) => {
     if (!API || !imageUrl) return '';
     return `${API.replace('/api', '')}${imageUrl}`;
   };
 
-  /* =========================
-     UI
-  ========================= */
   return (
     <div style={styles.page}>
       <h1 style={styles.title}>🖼 Gallery</h1>
@@ -127,11 +108,9 @@ export default function GalleryPage() {
               style={styles.image}
               alt={img.title}
             />
-
             <div style={styles.cardBody}>
               <h3 style={{ margin: 0 }}>{img.title}</h3>
               <p style={styles.desc}>{img.description}</p>
-
               <button
                 onClick={() => toggleLike(img.id)}
                 style={{
@@ -142,7 +121,6 @@ export default function GalleryPage() {
               >
                 ❤️ {img.likes_count}
               </button>
-
               {token && (
                 <button
                   onClick={() => deleteImage(img.id)}
@@ -156,11 +134,9 @@ export default function GalleryPage() {
         ))}
       </div>
 
-      {/* MODAL */}
       {selected && (
         <div style={styles.modal} onClick={() => setSelected(null)}>
           <div style={styles.modalBox} onClick={(e) => e.stopPropagation()}>
-
             <div style={styles.left}>
               <img
                 src={getImageUrl(selected.image_url)}
@@ -168,11 +144,9 @@ export default function GalleryPage() {
                 alt={selected.title}
               />
             </div>
-
             <div style={styles.right}>
               <h2>{selected.title}</h2>
               <p style={styles.desc}>{selected.description}</p>
-
               <button
                 onClick={() => toggleLike(selected.id)}
                 style={{
@@ -183,7 +157,6 @@ export default function GalleryPage() {
               >
                 ❤️ {selected.likes_count}
               </button>
-
               {token && (
                 <button
                   onClick={() => deleteImage(selected.id)}
@@ -192,9 +165,7 @@ export default function GalleryPage() {
                   🗑 Delete
                 </button>
               )}
-
               <hr style={{ margin: '15px 0' }} />
-
               <div style={styles.chat}>
                 {comments.map((c) => (
                   <div key={c.id} style={styles.comment}>
@@ -203,7 +174,6 @@ export default function GalleryPage() {
                   </div>
                 ))}
               </div>
-
               <div style={styles.inputBox}>
                 <input
                   value={commentText}
@@ -216,10 +186,91 @@ export default function GalleryPage() {
                 </button>
               </div>
             </div>
-
           </div>
         </div>
       )}
     </div>
   );
 }
+
+const styles = {
+  page: { padding: '20px' },
+  title: { textAlign: 'center', marginBottom: '30px' },
+  grid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+    gap: '20px',
+  },
+  card: {
+    background: '#fff',
+    borderRadius: '10px',
+    overflow: 'hidden',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+  },
+  image: { width: '100%', height: '200px', objectFit: 'cover', cursor: 'pointer' },
+  cardBody: { padding: '12px' },
+  desc: { color: '#666', fontSize: '14px' },
+  likeBtn: {
+    padding: '6px 12px',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    marginRight: '8px',
+  },
+  deleteBtn: {
+    padding: '6px 12px',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    background: '#ff4d4f',
+    color: '#fff',
+  },
+  modal: {
+    position: 'fixed',
+    inset: 0,
+    background: 'rgba(0,0,0,0.6)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2000,
+  },
+  modalBox: {
+    background: '#fff',
+    borderRadius: '12px',
+    display: 'flex',
+    maxWidth: '900px',
+    width: '90%',
+    maxHeight: '90vh',
+    overflow: 'hidden',
+  },
+  left: { flex: 1 },
+  modalImg: { width: '100%', height: '100%', objectFit: 'cover' },
+  right: {
+    width: '320px',
+    padding: '20px',
+    overflowY: 'auto',
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  chat: { flex: 1, overflowY: 'auto', marginBottom: '10px' },
+  comment: {
+    padding: '8px',
+    borderBottom: '1px solid #eee',
+    fontSize: '14px',
+  },
+  inputBox: { display: 'flex', gap: '8px' },
+  input: {
+    flex: 1,
+    padding: '8px',
+    border: '1px solid #ddd',
+    borderRadius: '6px',
+  },
+  sendBtn: {
+    padding: '8px 14px',
+    background: '#1677ff',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+  },
+};
