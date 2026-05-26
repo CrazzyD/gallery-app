@@ -11,9 +11,10 @@ import authRoutes from './routes/auth.js';
 import imageRoutes from './routes/images.js';
 import likeRoutes from './routes/likes.js';
 import userRoutes from './routes/users.js';
-import commentRoutes from './routes/comments.js'; // 👈 ДОБАВИЛИ
+import commentRoutes from './routes/comments.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 dotenv.config({ path: path.join(__dirname, '../.env') });
 
 const app = express();
@@ -29,11 +30,15 @@ app.use(
 );
 
 /* =========================
-   CORS (ВАЖНО: ДЛЯ AUTH + COOKIES + LOCALSTORAGE)
+   CORS FIX
 ========================= */
 app.use(
   cors({
-    origin: 'http://localhost:3000',
+    origin: [
+      'http://localhost:3000',
+      'https://gallery-pied-six.vercel.app',
+      'https://gallery-nequjxtzd-crazzyds-projects.vercel.app',
+    ],
     credentials: true,
   })
 );
@@ -50,7 +55,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(compression());
 
 /* =========================
-   STATIC FILES (UPLOADS FIX)
+   STATIC FILES
 ========================= */
 app.use(
   '/uploads',
@@ -70,10 +75,10 @@ app.use('/api/auth', authRoutes);
 app.use('/api/images', imageRoutes);
 app.use('/api/likes', likeRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api/comments', commentRoutes); // 👈 ВАЖНО
+app.use('/api/comments', commentRoutes);
 
 /* =========================
-   HEALTH CHECK
+   HEALTH
 ========================= */
 app.get('/api/health', (req, res) => {
   res.json({
@@ -83,10 +88,21 @@ app.get('/api/health', (req, res) => {
 });
 
 /* =========================
+   ROOT
+========================= */
+app.get('/', (req, res) => {
+  res.json({
+    message: 'Gallery Backend Running 🚀',
+  });
+});
+
+/* =========================
    404
 ========================= */
 app.use((req, res) => {
-  res.status(404).json({ error: 'Not found' });
+  res.status(404).json({
+    error: 'Not found',
+  });
 });
 
 /* =========================
@@ -94,6 +110,7 @@ app.use((req, res) => {
 ========================= */
 app.use((err, req, res, next) => {
   console.error('🔥 SERVER ERROR:', err);
+
   res.status(500).json({
     error: err.message || 'Internal server error',
   });
