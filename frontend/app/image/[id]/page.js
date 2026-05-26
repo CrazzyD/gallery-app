@@ -64,9 +64,7 @@ export default function ImageDetail() {
 
       setLiked((prev) => !prev);
 
-      setLikesCount((prev) =>
-        liked ? prev - 1 : prev + 1
-      );
+      setLikesCount((prev) => (liked ? prev - 1 : prev + 1));
     } catch (error) {
       console.error('Failed to update like:', error);
     }
@@ -93,8 +91,9 @@ export default function ImageDetail() {
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="bg-white rounded-lg shadow-lg overflow-hidden">
 
+          {/* ✅ FIX: Cloudinary image used directly */}
           <img
-            src={`${process.env.NEXT_PUBLIC_API_URL?.replace('/api','')}${image.image_url}`}
+            src={image.image_url}
             alt={image.title}
             className="w-full max-h-96 object-contain"
           />
