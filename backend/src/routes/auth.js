@@ -108,11 +108,13 @@ router.post('/login', async (req, res) => {
       },
       token
     });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Login failed' });
-  }
-});
+  catch (error) {
+  console.error("REGISTRATION ERROR:", error);
+  return res.status(500).json({
+    error: error.message,
+    stack: error.stack
+  });
+}
 
 router.get('/me', verifyToken, async (req, res) => {
   try {
