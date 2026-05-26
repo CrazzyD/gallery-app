@@ -1,139 +1,225 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
+import { useEffect, useState } from 'react';
+import axios from 'axios';
 
-/* =========================
-   STYLES (FIX FOR VERCEL)
-========================= */
+export default function GalleryPage() {
+  const [images, setImages] = useState([]);
+  const [selected, setSelected] = useState(null);
+  const [comments, setComments] = useState([]);
+  const [commentText, setCommentText] = useState('');
+  const [token, setToken] = useState(null);
 
-const styles = {
-  page: {
-    minHeight: '100vh',
-    background: '#f5f5f5',
-    padding: 30,
-  },
+  const API = process.env.NEXT_PUBLIC_API_URL || '';
 
-  title: {
-    textAlign: 'center',
-    marginBottom: 30,
-  },
+  // ✅ Читаем токен только на клиенте — не во время SSR/prerender
+  useEffect(() => {
+    setToken(localStorage.getItem('token'));
+  }, []);
 
-  grid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-    gap: 20,
-    maxWidth: 1200,
-    margin: '0 auto',
-  },
+  useEffect(() => {
+    if (!API) return; // ✅ Не делаем запрос если API не задан
+    axios
+      .get(`${API}/images`)
+      .then((res) => setImages(res.data.images ?? []))
+      .catch(console.error);
+  }, [API]);
 
-  card: {
-    background: '#fff',
-    borderRadius: 15,
-    overflow: 'hidden',
-    boxShadow: '0 5px 15px rgba(0,0,0,0.1)',
-  },
+  /* =========================
+     OPEN IMAGE
+  ========================= */
+  const openImage = async (img) => {
+    setSelected(img);
+    try {
+      const res = await axios.get(`${API}/comments/${img.id}`);
+      setComments(res.data);
+    } catch (err) {
+      console.error(err);
+      setComments([]);
+    }
+  };
 
-  image: {
-    width: '100%',
-    height: 220,
-    objectFit: 'cover',
-    cursor: 'pointer',
-  },
+  /* =========================
+     LIKE
+  ========================= */
+  const toggleLike = async (id) => {
+    try {
+      await axios.post(
+        `${API}/likes/${id}`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
 
-  cardBody: {
-    padding: 12,
-  },
+      setImages((prev) =>
+        prev.map((img) => {
+          if (img.id !== id) return img;
+          const updated = {
+            ...img,
+            liked: !img.liked,
+            likes_count: img.liked ? img.likes_count - 1 : img.likes_count + 1,
+          };
+          if (selected?.id === id) setSelected(updated);
+          return updated;
+        })
+      );
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
-  desc: {
-    color: '#666',
-    fontSize: 14,
-  },
+  /* =========================
+     DELETE IMAGE
+  ========================= */
+  const deleteImage = async (id) => {
+    if (!confirm('Удалить изображение?')) return;
+    try {
+      await axios.delete(`${API}/images/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setImages((prev) => prev.filter((img) => img.id !== id));
+      if (selected?.id === id) setSelected(null);
+    } catch (err) {
+      console.error(err);
+      alert('Ошибка удаления');
+    }
+  };
 
-  likeBtn: {
-    marginTop: 10,
-    padding: '6px 10px',
-    borderRadius: 8,
-    border: 'none',
-    cursor: 'pointer',
-    marginRight: 8,
-  },
+  /* =========================
+     SEND COMMENT
+  ========================= */
+  const sendComment = async () => {
+    if (!commentText.trim() || !selected) return;
+    try {
+      const res = await axios.post(
+        `${API}/comments/${selected.id}`,
+        { text: commentText },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setComments((prev) => [...prev, res.data]);
+      setCommentText('');
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
-  deleteBtn: {
-    marginTop: 10,
-    padding: '6px 10px',
-    borderRadius: 8,
-    border: 'none',
-    cursor: 'pointer',
-    background: '#111',
-    color: '#fff',
-  },
+  /* =========================
+     HELPERS
+  ========================= */
+  // ✅ Безопасное формирование URL — не крашится если API = undefined
+  const getImageUrl = (imageUrl) => {
+    if (!API || !imageUrl) return '';
+    return `${API.replace('/api', '')}${imageUrl}`;
+  };
 
-  modal: {
-    position: 'fixed',
-    inset: 0,
-    background: 'rgba(0,0,0,0.7)',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 9999,
-  },
+  /* =========================
+     UI
+  ========================= */
+  return (
+    <div style={styles.page}>
+      <h1 style={styles.title}>🖼 Gallery</h1>
 
-  modalBox: {
-    width: '90%',
-    height: '85%',
-    background: '#fff',
-    borderRadius: 12,
-    display: 'flex',
-    overflow: 'hidden',
-  },
+      <div style={styles.grid}>
+        {images.map((img) => (
+          <div key={img.id} style={styles.card}>
+            <img
+              src={getImageUrl(img.image_url)}
+              onClick={() => openImage(img)}
+              style={styles.image}
+              alt={img.title}
+            />
 
-  left: {
-    flex: 2,
-    background: '#000',
-  },
+            <div style={styles.cardBody}>
+              <h3 style={{ margin: 0 }}>{img.title}</h3>
+              <p style={styles.desc}>{img.description}</p>
 
-  modalImg: {
-    width: '100%',
-    height: '100%',
-    objectFit: 'contain',
-  },
+              <button
+                onClick={() => toggleLike(img.id)}
+                style={{
+                  ...styles.likeBtn,
+                  background: img.liked ? '#ff4d4f' : '#eee',
+                  color: img.liked ? '#fff' : '#000',
+                }}
+              >
+                ❤️ {img.likes_count}
+              </button>
 
-  right: {
-    flex: 1,
-    padding: 15,
-    display: 'flex',
-    flexDirection: 'column',
-    borderLeft: '1px solid #eee',
-  },
+              {token && (
+                <button
+                  onClick={() => deleteImage(img.id)}
+                  style={styles.deleteBtn}
+                >
+                  🗑 Delete
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
 
-  chat: {
-    flex: 1,
-    overflowY: 'auto',
-  },
+      {/* MODAL */}
+      {selected && (
+        <div style={styles.modal} onClick={() => setSelected(null)}>
+          <div style={styles.modalBox} onClick={(e) => e.stopPropagation()}>
 
-  comment: {
-    marginBottom: 10,
-  },
+            <div style={styles.left}>
+              <img
+                src={getImageUrl(selected.image_url)}
+                style={styles.modalImg}
+                alt={selected.title}
+              />
+            </div>
 
-  inputBox: {
-    display: 'flex',
-    gap: 5,
-    marginTop: 10,
-  },
+            <div style={styles.right}>
+              <h2>{selected.title}</h2>
+              <p style={styles.desc}>{selected.description}</p>
 
-  input: {
-    flex: 1,
-    padding: 8,
-    border: '1px solid #ddd',
-    borderRadius: 8,
-  },
+              <button
+                onClick={() => toggleLike(selected.id)}
+                style={{
+                  ...styles.likeBtn,
+                  background: selected.liked ? '#ff4d4f' : '#eee',
+                  color: selected.liked ? '#fff' : '#000',
+                }}
+              >
+                ❤️ {selected.likes_count}
+              </button>
 
-  sendBtn: {
-    padding: '8px 12px',
-    border: 'none',
-    borderRadius: 8,
-    background: '#4f46e5',
-    color: '#fff',
-    cursor: 'pointer',
-  },
-};
+              {token && (
+                <button
+                  onClick={() => deleteImage(selected.id)}
+                  style={styles.deleteBtn}
+                >
+                  🗑 Delete
+                </button>
+              )}
+
+              <hr style={{ margin: '15px 0' }} />
+
+              <div style={styles.chat}>
+                {comments.map((c) => (
+                  <div key={c.id} style={styles.comment}>
+                    <b>{c.username}</b>
+                    <div>{c.text}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={styles.inputBox}>
+                <input
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  placeholder="Написать..."
+                  style={styles.input}
+                />
+                <button onClick={sendComment} style={styles.sendBtn}>
+                  Send
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
