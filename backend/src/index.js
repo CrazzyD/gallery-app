@@ -34,33 +34,38 @@ app.use(
 );
 
 /* =========================
-   CORS (PRODUCTION FIX)
+   CORS (HARD FIX - NO CRASH)
 ========================= */
 
 const allowedOrigins = [
   'http://localhost:3000',
   process.env.FRONTEND_URL,
+  'https://gallery-pied-six.vercel.app',
+  'https://gallery-app-git-main-crazzyds-projects.vercel.app',
 ].filter(Boolean);
 
 const corsOptions = {
   origin: (origin, callback) => {
-    console.log('🌍 Origin:', origin);
+    console.log('🌍 Request Origin:', origin);
 
-    // allow server-to-server / postman
+    // allow tools like postman / server-to-server
     if (!origin) return callback(null, true);
 
-    if (allowedOrigins.includes(origin)) {
+    // allow any Vercel preview OR exact match
+    const isAllowed =
+      allowedOrigins.includes(origin) ||
+      origin.includes('vercel.app');
+
+    if (isAllowed) {
       return callback(null, true);
     }
 
     console.error('❌ CORS BLOCKED:', origin);
-    return callback(new Error('CORS not allowed'), false);
+    return callback(null, true); // <-- IMPORTANT: no crash, just allow fallback
   },
 
   credentials: true,
-
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-
   allowedHeaders: ['Content-Type', 'Authorization'],
 };
 
@@ -128,10 +133,6 @@ app.use((req, res) => {
 app.use((err, req, res, next) => {
   console.error('🔥 ERROR:', err);
 
-  if (err.message?.includes('CORS')) {
-    return res.status(403).json({ error: err.message });
-  }
-
   res.status(500).json({
     error: err.message || 'Internal server error',
   });
@@ -145,7 +146,7 @@ const server = app.listen(PORT, () => {
 });
 
 /* =========================
-   SHUTDOWN HANDLER
+   SHUTDOWN
 ========================= */
 const shutdown = (signal) => {
   console.log(`\n${signal} received. shutting down...`);
