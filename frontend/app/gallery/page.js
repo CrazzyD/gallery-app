@@ -15,11 +15,12 @@ export default function GalleryPage() {
   const API = process.env.NEXT_PUBLIC_API_URL || '';
 
   useEffect(() => {
-    setToken(localStorage.getItem('token'));
+    setToken(typeof window !== 'undefined' ? localStorage.getItem('token') : null);
   }, []);
 
   useEffect(() => {
     if (!API) return;
+
     axios
       .get(`${API}/images`)
       .then((res) => setImages(res.data.images ?? []))
@@ -28,6 +29,7 @@ export default function GalleryPage() {
 
   const openImage = async (img) => {
     setSelected(img);
+
     try {
       const res = await axios.get(`${API}/comments/${img.id}`);
       setComments(res.data);
@@ -44,15 +46,21 @@ export default function GalleryPage() {
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
+
       setImages((prev) =>
         prev.map((img) => {
           if (img.id !== id) return img;
+
           const updated = {
             ...img,
             liked: !img.liked,
-            likes_count: img.liked ? img.likes_count - 1 : img.likes_count + 1,
+            likes_count: img.liked
+              ? img.likes_count - 1
+              : img.likes_count + 1,
           };
+
           if (selected?.id === id) setSelected(updated);
+
           return updated;
         })
       );
@@ -63,11 +71,14 @@ export default function GalleryPage() {
 
   const deleteImage = async (id) => {
     if (!confirm('Удалить изображение?')) return;
+
     try {
       await axios.delete(`${API}/images/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+
       setImages((prev) => prev.filter((img) => img.id !== id));
+
       if (selected?.id === id) setSelected(null);
     } catch (err) {
       console.error(err);
@@ -77,12 +88,14 @@ export default function GalleryPage() {
 
   const sendComment = async () => {
     if (!commentText.trim() || !selected) return;
+
     try {
       const res = await axios.post(
         `${API}/comments/${selected.id}`,
         { text: commentText },
         { headers: { Authorization: `Bearer ${token}` } }
       );
+
       setComments((prev) => [...prev, res.data]);
       setCommentText('');
     } catch (err) {
@@ -90,8 +103,18 @@ export default function GalleryPage() {
     }
   };
 
+  // =========================
+  // 💥 FIX: Cloudinary SAFE URL
+  // =========================
   const getImageUrl = (imageUrl) => {
-    if (!API || !imageUrl) return '';
+    if (!imageUrl) return '';
+
+    // Cloudinary (ВАЖНО)
+    if (imageUrl.startsWith('http')) {
+      return imageUrl;
+    }
+
+    // fallback (если старые локальные файлы останутся)
     return `${API.replace('/api', '')}${imageUrl}`;
   };
 
@@ -108,9 +131,11 @@ export default function GalleryPage() {
               style={styles.image}
               alt={img.title}
             />
+
             <div style={styles.cardBody}>
               <h3 style={{ margin: 0 }}>{img.title}</h3>
               <p style={styles.desc}>{img.description}</p>
+
               <button
                 onClick={() => toggleLike(img.id)}
                 style={{
@@ -121,6 +146,7 @@ export default function GalleryPage() {
               >
                 ❤️ {img.likes_count}
               </button>
+
               {token && (
                 <button
                   onClick={() => deleteImage(img.id)}
@@ -144,9 +170,11 @@ export default function GalleryPage() {
                 alt={selected.title}
               />
             </div>
+
             <div style={styles.right}>
               <h2>{selected.title}</h2>
               <p style={styles.desc}>{selected.description}</p>
+
               <button
                 onClick={() => toggleLike(selected.id)}
                 style={{
@@ -157,6 +185,7 @@ export default function GalleryPage() {
               >
                 ❤️ {selected.likes_count}
               </button>
+
               {token && (
                 <button
                   onClick={() => deleteImage(selected.id)}
@@ -165,7 +194,9 @@ export default function GalleryPage() {
                   🗑 Delete
                 </button>
               )}
+
               <hr style={{ margin: '15px 0' }} />
+
               <div style={styles.chat}>
                 {comments.map((c) => (
                   <div key={c.id} style={styles.comment}>
@@ -174,6 +205,7 @@ export default function GalleryPage() {
                   </div>
                 ))}
               </div>
+
               <div style={styles.inputBox}>
                 <input
                   value={commentText}
@@ -181,6 +213,7 @@ export default function GalleryPage() {
                   placeholder="Написать..."
                   style={styles.input}
                 />
+
                 <button onClick={sendComment} style={styles.sendBtn}>
                   Send
                 </button>
@@ -196,20 +229,31 @@ export default function GalleryPage() {
 const styles = {
   page: { padding: '20px' },
   title: { textAlign: 'center', marginBottom: '30px' },
+
   grid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
     gap: '20px',
   },
+
   card: {
     background: '#fff',
     borderRadius: '10px',
     overflow: 'hidden',
     boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
   },
-  image: { width: '100%', height: '200px', objectFit: 'cover', cursor: 'pointer' },
+
+  image: {
+    width: '100%',
+    height: '200px',
+    objectFit: 'cover',
+    cursor: 'pointer',
+  },
+
   cardBody: { padding: '12px' },
+
   desc: { color: '#666', fontSize: '14px' },
+
   likeBtn: {
     padding: '6px 12px',
     border: 'none',
@@ -217,6 +261,7 @@ const styles = {
     cursor: 'pointer',
     marginRight: '8px',
   },
+
   deleteBtn: {
     padding: '6px 12px',
     border: 'none',
@@ -225,6 +270,7 @@ const styles = {
     background: '#ff4d4f',
     color: '#fff',
   },
+
   modal: {
     position: 'fixed',
     inset: 0,
@@ -234,6 +280,7 @@ const styles = {
     justifyContent: 'center',
     zIndex: 2000,
   },
+
   modalBox: {
     background: '#fff',
     borderRadius: '12px',
@@ -243,8 +290,15 @@ const styles = {
     maxHeight: '90vh',
     overflow: 'hidden',
   },
+
   left: { flex: 1 },
-  modalImg: { width: '100%', height: '100%', objectFit: 'cover' },
+
+  modalImg: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+  },
+
   right: {
     width: '320px',
     padding: '20px',
@@ -252,19 +306,31 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
   },
-  chat: { flex: 1, overflowY: 'auto', marginBottom: '10px' },
+
+  chat: {
+    flex: 1,
+    overflowY: 'auto',
+    marginBottom: '10px',
+  },
+
   comment: {
     padding: '8px',
     borderBottom: '1px solid #eee',
     fontSize: '14px',
   },
-  inputBox: { display: 'flex', gap: '8px' },
+
+  inputBox: {
+    display: 'flex',
+    gap: '8px',
+  },
+
   input: {
     flex: 1,
     padding: '8px',
     border: '1px solid #ddd',
     borderRadius: '6px',
   },
+
   sendBtn: {
     padding: '8px 14px',
     background: '#1677ff',
